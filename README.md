@@ -9,7 +9,7 @@ Hi
   ```
 
 In container (client)
-```
+  ```
   echo DATABASE_URL=postgres://admin:admin@<IPv4-addrress>/admin > .env
   ```
   
