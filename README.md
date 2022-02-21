@@ -1,5 +1,5 @@
 # service
-### Diesel+SQL
+### Diesel+GraphQL
   
 # How to run diesel
   * Build server repo
