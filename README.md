@@ -11,8 +11,6 @@ Hi
 In container (client)
 ```
   echo DATABASE_URL=postgres://admin:admin@<IPv4-addrress>/admin > .env
-  diesel setup
-  diesel print-schema > src/schema.rs
   ```
   
 # How to run disel
