@@ -1,19 +1,7 @@
 # service
-Hi
-
-# How to set up diesel
-  In Local
-  Confirme IPv4
-  ```
-  docker network inspect my-network
-  ```
-
-In container (client)
-  ```
-  echo DATABASE_URL=postgres://admin:admin@<IPv4-addrress>/admin > .env
-  ```
+### Diesel+SQL
   
-# How to run disel
+# How to run diesel
   * Build server repo
   ```
    cargo build 
