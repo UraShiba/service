@@ -49,6 +49,7 @@ impl Mutation {
             .values(&user)
             .execute(conn)
             .expect("Error saving new Users");
+        context.sender.send(user.clone()).unwrap();
         Ok(user)
     }
 }
