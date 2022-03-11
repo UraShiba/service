@@ -26,7 +26,7 @@ pub async fn main() -> io::Result<()> {
             .configure(graphql_endpoints)
             .configure(subscription_endpoints)
     })
-    .bind("127.0.0.1:2222")?
+    .bind("127.0.0.1:5050")?
     .run()
     .await
 }
