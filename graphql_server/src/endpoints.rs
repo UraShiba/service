@@ -1,11 +1,13 @@
 use super::context::{GraphQLContext, PostgresPool};
 use super::graphql::Schema;
+use super::models::UserInfo;
 use actix_web::{web, Error, HttpRequest, HttpResponse};
 use juniper::http::playground::playground_source;
 use juniper_actix::graphql_handler;
 use juniper_actix::subscriptions::subscriptions_handler;
 use juniper_graphql_ws::ConnectionConfig;
 use std::time::Duration;
+use tokio::sync::broadcast;
 
 // The configuration callback that enables us to add the /graphql route
 // to the actix-web server.
@@ -26,10 +28,11 @@ async fn subscriptions(
     pool: web::Data<PostgresPool>,
     // The GraphQL schema
     schema: web::Data<Schema>,
-    // The incoming HTTP request
+    sender: web::Data<broadcast::Sender<UserInfo>>,
 ) -> Result<HttpResponse, Error> {
     let ctx = GraphQLContext {
         pool: pool.get_ref().to_owned(),
+        sender: sender.get_ref().to_owned(),
     };
     let schema = schema.into_inner();
     let config = ConnectionConfig::new(ctx);
@@ -55,11 +58,12 @@ async fn graphql(
     pool: web::Data<PostgresPool>,
     // The GraphQL schema
     schema: web::Data<Schema>,
-    // The incoming HTTP request
+    sender: web::Data<broadcast::Sender<UserInfo>>,
 ) -> Result<HttpResponse, Error> {
     // Instantiate a context
     let ctx = GraphQLContext {
         pool: pool.get_ref().to_owned(),
+        sender: sender.get_ref().to_owned(),
     };
     graphql_handler(&schema, &ctx, req, payload).await
 }
