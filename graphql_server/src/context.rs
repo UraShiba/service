@@ -14,8 +14,8 @@ pub fn get_pool(env: &str) -> PostgresPool {
     // TODO: pass the connection URL into this function rather than extracting
     // it from the environment within this function
     dotenv().ok();
-    let url = env::var(env).expect("environment value must be set"); // TODO: handle error
-                                                                     // A connection pool maintains a set of open connections to a database, handing them out for repeated use.
+    let url = env::var(env).expect("environment value must be set");
+    // A connection pool maintains a set of open connections to a database, handing them out for repeated use.
     let mgr = ConnectionManager::<PgConnection>::new(url);
 
     r2d2::Pool::builder()
