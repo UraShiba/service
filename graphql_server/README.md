@@ -2,23 +2,13 @@
 ### Diesel+GraphQL
   
 # How to run diesel
-  * Build server repo
+  * run server
+  In graphql_server
   ```
-   cargo build 
+   cargo run 
   ```
-  * Insert data to Database
+  * launch playground
+  In Host PC
   ```
-   cargo run insert 
-  ```
-  * Delete data to Database
-  ```
-   cargo run delete <id> 
-  ```
- * Show specific data from Database
-  ```
-   cargo run query <id> 
- ```
- * Update data in Database
-  ```
-   cargo run update_pass <id> <pass> 
+   http://localhost:5050/graphql
   ```
