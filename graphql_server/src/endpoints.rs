@@ -1,3 +1,5 @@
+use crate::models::ChatMessage;
+
 use super::context::{GraphQLContext, PostgresPool};
 use super::graphql::Schema;
 use super::models::UserInfo;
@@ -29,10 +31,12 @@ async fn subscriptions(
     // The GraphQL schema
     schema: web::Data<Schema>,
     sender: web::Data<broadcast::Sender<UserInfo>>,
+    chat_message_sender: web::Data<broadcast::Sender<ChatMessage>>,
 ) -> Result<HttpResponse, Error> {
     let ctx = GraphQLContext {
         pool: pool.get_ref().to_owned(),
         sender: sender.get_ref().to_owned(),
+        chat_message_sender: chat_message_sender.get_ref().to_owned(),
     };
     let schema = schema.into_inner();
     let config = ConnectionConfig::new(ctx);
@@ -59,11 +63,13 @@ async fn graphql(
     // The GraphQL schema
     schema: web::Data<Schema>,
     sender: web::Data<broadcast::Sender<UserInfo>>,
+    chat_message_sender: web::Data<broadcast::Sender<ChatMessage>>,
 ) -> Result<HttpResponse, Error> {
     // Instantiate a context
     let ctx = GraphQLContext {
         pool: pool.get_ref().to_owned(),
         sender: sender.get_ref().to_owned(),
+        chat_message_sender: chat_message_sender.get_ref().to_owned(),
     };
     graphql_handler(&schema, &ctx, req, payload).await
 }

@@ -5,6 +5,8 @@ use r2d2::Pool;
 use std::env;
 use tokio::sync::broadcast;
 
+use crate::models::ChatMessage;
+
 use super::models::UserInfo;
 
 // The Postgres-specific connection pool managing all database connections.
@@ -29,6 +31,7 @@ pub fn get_pool(env: &str) -> PostgresPool {
 pub struct GraphQLContext {
     pub pool: PostgresPool,
     pub sender: broadcast::Sender<UserInfo>,
+    pub chat_message_sender: broadcast::Sender<ChatMessage>,
 }
 
 // This impl allows us to pass in GraphQLContext as the Context for GraphQL
