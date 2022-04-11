@@ -48,4 +48,32 @@ subscription {
     pass,
   }
 }
+
+mutation ($messageId:Int!,$fromUserId:Int!,$toUserId:Int!,$messageText:String!,$sentDatetime:String!) {
+  sendMessage(messageId:$messageId,fromUserId:$fromUserId,toUserId:$toUserId,messageText:$messageText,sentDatetime:$sentDatetime,){
+    messageId,
+    fromUserId,
+    toUserId,
+    messageText,
+    sentDatetime,
+  }
+}
+
+{
+  "messageId": 2,
+  "fromUserId": 10,
+  "toUserId":  500,
+  "messageText": "Second Message Hello",
+  "sentDatetime": "2022-04-11-18:23"
+}
+
+subscription {
+  subscribeMessage {
+    messageId,
+    fromUserId,
+    toUserId,
+    messageText,
+    sentDatetime,
+  }
+}
 ```
