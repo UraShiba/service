@@ -17,4 +17,7 @@ table! {
     }
 }
 
-allow_tables_to_appear_in_same_query!(chat_message, user_info,);
+allow_tables_to_appear_in_same_query!(
+    chat_message,
+    user_info,
+);
