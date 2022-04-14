@@ -14,6 +14,7 @@
   ```
 
 # Schema
+## Sign Up
 ```
 mutation ($userId:Int!,$userName:String!,$loginName:String!,$pass:String!) {
   signUp(userId:$userId,userName:$userName,loginName:$loginName,pass:$pass,){
@@ -48,9 +49,31 @@ subscription {
     pass,
   }
 }
+```
+## Chat Message
+### Send Message
+```
+mutation ($messageId:Int!,$fromUserId:Int!,$toUserId:Int!,$messageText:String!) {
+  sendMessage(messageId:$messageId,fromUserId:$fromUserId,toUserId:$toUserId,messageText:$messageText){
+    messageId,
+    fromUserId,
+    toUserId,
+    messageText,
+  }
+}
 
-mutation ($messageId:Int!,$fromUserId:Int!,$toUserId:Int!,$messageText:String!,$sentDatetime:String!) {
-  sendMessage(messageId:$messageId,fromUserId:$fromUserId,toUserId:$toUserId,messageText:$messageText,sentDatetime:$sentDatetime,){
+{
+  "messageId": 10000,
+  "fromUserId": 10,
+  "toUserId":  500,
+  "messageText": "First Message Hello 500",
+}
+```
+### Subscribe Message
+* Receiver
+```
+subscription {
+  subscribeMessage(id: 500) {
     messageId,
     fromUserId,
     toUserId,
@@ -58,17 +81,36 @@ mutation ($messageId:Int!,$fromUserId:Int!,$toUserId:Int!,$messageText:String!,$
     sentDatetime,
   }
 }
-
-{
-  "messageId": 2,
-  "fromUserId": 10,
-  "toUserId":  500,
-  "messageText": "Second Message Hello",
-  "sentDatetime": "2022-04-11-18:23"
-}
-
+```
+* Sender
+```
 subscription {
-  subscribeMessage {
+  subscribeMessage(id: 10) {
+    messageId,
+    fromUserId,
+    toUserId,
+    messageText,
+    sentDatetime,
+  }
+}
+```
+### Get All Message
+* Receiver
+```
+query {
+  getMessageByQuery(id:500){
+    messageId,
+    fromUserId,
+    toUserId,
+    messageText,
+    sentDatetime,
+  }
+}
+```
+* Sender
+```
+query {
+  getMessageByQuery(id:10){
     messageId,
     fromUserId,
     toUserId,

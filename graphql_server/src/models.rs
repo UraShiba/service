@@ -1,4 +1,5 @@
 use super::context::GraphQLContext;
+use super::schema::chat_message;
 use super::schema::user_info;
 use juniper::graphql_object;
 
@@ -27,7 +28,8 @@ impl UserInfo {
     }
 }
 
-#[derive(Queryable, Debug, Clone)]
+#[derive(Queryable, Debug, Insertable, Clone)]
+#[table_name = "chat_message"]
 pub struct ChatMessage {
     pub message_id: i32,
     pub from_user_id: i32,
