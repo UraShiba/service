@@ -1,14 +1,20 @@
+use crate::models::Response;
+
 use super::context::GraphQLContext;
 use super::models::ChatMessage;
 use super::models::UserInfo;
 use super::schema::chat_message::dsl::chat_message;
 use super::schema::user_info::dsl::user_info;
+use actix_web::http::header;
 use chrono::{DateTime, Local};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use juniper::{graphql_object, graphql_subscription, FieldError};
 use juniper::{FieldResult, RootNode};
+use serde::Deserialize;
+use serde::Serialize;
 use std::pin::Pin;
+use tokio::sync::oneshot::error;
 use tokio_stream::Stream;
 
 type UserInfoStream = Pin<Box<dyn Stream<Item = Result<UserInfo, FieldError>> + Send>>;
@@ -23,15 +29,21 @@ pub fn schema() -> Schema {
 pub struct Query;
 #[graphql_object(context = GraphQLContext)]
 impl Query {
-    async fn getAccountByQuery(context: &GraphQLContext, id: i32) -> FieldResult<Vec<UserInfo>> {
+    async fn getAccountByQuery(
+        context: &GraphQLContext,
+        email: String,
+    ) -> FieldResult<Vec<UserInfo>> {
         let conn: &PgConnection = &context.pool.get().unwrap();
         let results = user_info
-            .find(id)
+            .find(email)
             .load::<UserInfo>(conn)
             .expect("Error loading customer");
         Ok(results)
     }
-    async fn getMessageByQuery(context: &GraphQLContext, id: i32) -> FieldResult<Vec<ChatMessage>> {
+    async fn getMessageByQuery(
+        context: &GraphQLContext,
+        id: String,
+    ) -> FieldResult<Vec<ChatMessage>> {
         let conn: &PgConnection = &context.pool.get().unwrap();
         let results = chat_message
             .filter(crate::schema::chat_message::to_user_id.eq(id))
@@ -46,31 +58,77 @@ pub struct Mutation;
 impl Mutation {
     async fn signUp(
         context: &GraphQLContext,
-        user_id: i32,
+        user_id: String,
         user_name: String,
-        login_name: String,
-        pass: String,
-    ) -> FieldResult<UserInfo> {
+        email: String,
+        password: String,
+    ) -> FieldResult<Response> {
+        let conn: &PgConnection = &context.pool.get().unwrap();
+        let key = email.clone();
+        let id = user_id.clone();
+        let user = UserInfo {
+            user_id,
+            user_name,
+            email,
+            password,
+        };
+
+        let results = user_info.find(key).load::<UserInfo>(conn);
+        let response;
+        match results {
+            Ok(_) => {
+                response = Ok(Response {
+                    token: None,
+                    error: Some("Email is already exist".to_string()),
+                });
+            }
+            Err(_) => {
+                diesel::insert_into(user_info)
+                    .values(&user)
+                    .execute(conn)
+                    .expect("Error saving new Users");
+                context.sender.send(user.clone()).unwrap();
+                let token = encode(&JWT_SECRET.to_string(), &id);
+                response = Ok(Response {
+                    token: Some(token),
+                    error: None,
+                });
+            }
+        }
+
+        response
+    }
+
+    async fn signIn(
+        context: &GraphQLContext,
+        user_id: String,
+        user_name: String,
+        email: String,
+        password: String,
+    ) -> FieldResult<Response> {
         let conn: &PgConnection = &context.pool.get().unwrap();
         let user = UserInfo {
             user_id,
             user_name,
-            login_name,
-            pass,
+            email,
+            password,
         };
         diesel::insert_into(user_info)
             .values(&user)
             .execute(conn)
             .expect("Error saving new Users");
         context.sender.send(user.clone()).unwrap();
-        Ok(user)
+        Ok(Response {
+            token: Some("sss".to_string()),
+            error: Some("sss".to_string()),
+        })
     }
 
     async fn send_message(
         context: &GraphQLContext,
         message_id: i32,
-        from_user_id: i32,
-        to_user_id: i32,
+        from_user_id: String,
+        to_user_id: String,
         message_text: String,
     ) -> FieldResult<ChatMessage> {
         let conn: &PgConnection = &context.pool.get().unwrap();
@@ -105,7 +163,7 @@ impl Subscription {
             })
             .boxed()
     }
-    async fn subscribe_message(context: &GraphQLContext, id: i32) -> ChatMessageStream {
+    async fn subscribe_message(context: &GraphQLContext, id: String) -> ChatMessageStream {
         tokio_stream::wrappers::BroadcastStream::new(context.chat_message_sender.subscribe())
             .map(move |result| match result {
                 Ok(sent_message) => {
@@ -124,4 +182,27 @@ impl Subscription {
             })
             .boxed()
     }
+}
+
+const JWT_SECRET: &str = "urashiba";
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Claims {
+    exp: i64,
+    uuid: String,
+}
+
+pub fn encode(secret: &String, id: &String) -> String {
+    let mut header = jsonwebtoken::Header::default();
+    header.typ = Some(String::from("JWT"));
+    header.alg = jsonwebtoken::Algorithm::HS256;
+    let claim = Claims {
+        exp: (chrono::Utc::now() + chrono::Duration::hours(8)).timestamp(),
+        uuid: id.to_string(),
+    };
+    jsonwebtoken::encode(
+        &header,
+        &claim,
+        &jsonwebtoken::EncodingKey::from_secret(secret.as_ref()),
+    )
+    .unwrap()
 }
