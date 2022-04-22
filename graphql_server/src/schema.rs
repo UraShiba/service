@@ -1,18 +1,18 @@
 table! {
     chat_message (message_id) {
         message_id -> Int4,
-        from_user_id -> Int4,
-        to_user_id -> Int4,
+        from_user_id -> Text,
+        to_user_id -> Text,
         message_text -> Text,
-        sent_datetime -> Text,
+        sent_date_time -> Text,
     }
 }
 
 table! {
     user_info (user_id) {
-        user_id -> Int4,
+        user_id -> Text,
         user_name -> Text,
-        login_name -> Text,
+        email -> Text,
         pass -> Text,
     }
 }
