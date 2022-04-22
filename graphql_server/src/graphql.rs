@@ -5,17 +5,18 @@ use super::models::ChatMessage;
 use super::models::UserInfo;
 use super::schema::chat_message::dsl::chat_message;
 use super::schema::user_info::dsl::user_info;
-use actix_web::http::header;
+
 use chrono::{DateTime, Local};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use juniper::{graphql_object, graphql_subscription, FieldError};
 use juniper::{FieldResult, RootNode};
+use pwhash::bcrypt;
 use serde::Deserialize;
 use serde::Serialize;
 use std::pin::Pin;
-use tokio::sync::oneshot::error;
 use tokio_stream::Stream;
+use uuid::Uuid;
 
 type UserInfoStream = Pin<Box<dyn Stream<Item = Result<UserInfo, FieldError>> + Send>>;
 type ChatMessageStream =
@@ -58,70 +59,82 @@ pub struct Mutation;
 impl Mutation {
     async fn signUp(
         context: &GraphQLContext,
-        user_id: String,
         user_name: String,
         email: String,
-        password: String,
+        pass: String,
     ) -> FieldResult<Response> {
         let conn: &PgConnection = &context.pool.get().unwrap();
-        let key = email.clone();
-        let id = user_id.clone();
+        let user_id = Uuid::new_v4().to_hyphenated().to_string();
+        let hashing_pass = hashing_password(&pass);
+
+        let results = user_info
+            .filter(crate::schema::user_info::email.eq(email.clone()))
+            .limit(1)
+            .load::<UserInfo>(conn);
+
         let user = UserInfo {
             user_id,
             user_name,
             email,
-            password,
+            pass: hashing_pass,
         };
 
-        let results = user_info.find(key).load::<UserInfo>(conn);
-        let response;
-        match results {
-            Ok(_) => {
-                response = Ok(Response {
-                    token: None,
-                    error: Some("Email is already exist".to_string()),
-                });
-            }
+        let response = match results {
+            Ok(_) => Ok(Response {
+                token: None,
+                error: Some("Email is already exist".to_string()),
+            }),
             Err(_) => {
                 diesel::insert_into(user_info)
                     .values(&user)
                     .execute(conn)
                     .expect("Error saving new Users");
-                context.sender.send(user.clone()).unwrap();
-                let token = encode(&JWT_SECRET.to_string(), &id);
-                response = Ok(Response {
+
+                let token = encode(&JWT_SECRET.to_string(), &user.user_id);
+                Ok(Response {
                     token: Some(token),
                     error: None,
-                });
+                })
             }
-        }
+        };
 
         response
     }
 
     async fn signIn(
         context: &GraphQLContext,
-        user_id: String,
-        user_name: String,
         email: String,
-        password: String,
+        pass: String,
     ) -> FieldResult<Response> {
         let conn: &PgConnection = &context.pool.get().unwrap();
-        let user = UserInfo {
-            user_id,
-            user_name,
-            email,
-            password,
+        let results = user_info
+            .filter(crate::schema::user_info::email.eq(email.clone()))
+            .limit(1)
+            .load::<UserInfo>(conn);
+
+        let response = match results {
+            Ok(users) => {
+                let user = users.first().unwrap();
+                match bcrypt::verify(pass, &user.pass) {
+                    true => {
+                        let token = encode(&JWT_SECRET.to_string(), &user.user_id);
+                        Ok(Response {
+                            token: Some(token),
+                            error: None,
+                        })
+                    }
+                    false => Ok(Response {
+                        token: None,
+                        error: Some("Password is wrong".to_string()),
+                    }),
+                }
+            }
+            Err(_) => Ok(Response {
+                token: None,
+                error: Some("Email doesn't exist".to_string()),
+            }),
         };
-        diesel::insert_into(user_info)
-            .values(&user)
-            .execute(conn)
-            .expect("Error saving new Users");
-        context.sender.send(user.clone()).unwrap();
-        Ok(Response {
-            token: Some("sss".to_string()),
-            error: Some("sss".to_string()),
-        })
+        response
     }
 
     async fn send_message(
@@ -132,13 +145,13 @@ impl Mutation {
         message_text: String,
     ) -> FieldResult<ChatMessage> {
         let conn: &PgConnection = &context.pool.get().unwrap();
-        let local_datetime: DateTime<Local> = Local::now();
+        let local_date_time: DateTime<Local> = Local::now();
         let sent_message = ChatMessage {
             message_id,
             from_user_id,
             to_user_id,
             message_text,
-            sent_datetime: local_datetime.to_string(),
+            sent_date_time: local_date_time.to_string(),
         };
         diesel::insert_into(chat_message)
             .values(&sent_message)
@@ -205,4 +218,8 @@ pub fn encode(secret: &String, id: &String) -> String {
         &jsonwebtoken::EncodingKey::from_secret(secret.as_ref()),
     )
     .unwrap()
+}
+
+pub fn hashing_password(password: &String) -> String {
+    bcrypt::hash(password).unwrap()
 }

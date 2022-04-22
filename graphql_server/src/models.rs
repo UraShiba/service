@@ -24,7 +24,7 @@ pub struct UserInfo {
     pub user_id: String,
     pub user_name: String,
     pub email: String,
-    pub password: String,
+    pub pass: String,
 }
 
 #[graphql_object(context = GraphQLContext)]
@@ -39,7 +39,7 @@ impl UserInfo {
         &self.email
     }
     fn pass(&self) -> &str {
-        &self.password
+        &self.pass
     }
 }
 
@@ -50,7 +50,7 @@ pub struct ChatMessage {
     pub from_user_id: String,
     pub to_user_id: String,
     pub message_text: String,
-    pub sent_datetime: String,
+    pub sent_date_time: String,
 }
 
 #[graphql_object(context = GraphQLContext)]
@@ -67,7 +67,7 @@ impl ChatMessage {
     fn message_text(&self) -> &str {
         &self.message_text
     }
-    fn sent_datetime(&self) -> &str {
-        &self.sent_datetime
+    fn sent_date_time(&self) -> &str {
+        &self.sent_date_time
     }
 }
