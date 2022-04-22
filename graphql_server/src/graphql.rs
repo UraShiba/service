@@ -18,7 +18,6 @@ use std::pin::Pin;
 use tokio_stream::Stream;
 use uuid::Uuid;
 
-type UserInfoStream = Pin<Box<dyn Stream<Item = Result<UserInfo, FieldError>> + Send>>;
 type ChatMessageStream =
     Pin<Box<dyn Stream<Item = Result<Option<ChatMessage>, FieldError>> + Send>>;
 pub type Schema = RootNode<'static, Query, Mutation, Subscription>;
@@ -30,13 +29,11 @@ pub fn schema() -> Schema {
 pub struct Query;
 #[graphql_object(context = GraphQLContext)]
 impl Query {
-    async fn getAccountByQuery(
+    async fn getAccounts(
         context: &GraphQLContext,
-        email: String,
     ) -> FieldResult<Vec<UserInfo>> {
         let conn: &PgConnection = &context.pool.get().unwrap();
         let results = user_info
-            .find(email)
             .load::<UserInfo>(conn)
             .expect("Error loading customer");
         Ok(results)
@@ -80,22 +77,29 @@ impl Mutation {
         };
 
         let response = match results {
-            Ok(_) => Ok(Response {
-                token: None,
-                error: Some("Email is already exist".to_string()),
-            }),
-            Err(_) => {
-                diesel::insert_into(user_info)
-                    .values(&user)
-                    .execute(conn)
-                    .expect("Error saving new Users");
+            Ok(users) => {
+                if users.len() > 0 {
+                    Ok(Response {
+                        token: None,
+                        error: Some("Email already exists".to_string()),
+                    })
+                } else {
+                    diesel::insert_into(user_info)
+                        .values(&user)
+                        .execute(conn)
+                        .expect("Error adding new Users");
 
-                let token = encode(&JWT_SECRET.to_string(), &user.user_id);
-                Ok(Response {
-                    token: Some(token),
-                    error: None,
-                })
+                    let token = encode(&JWT_SECRET.to_string(), &user.user_id);
+                    Ok(Response {
+                        token: Some(token),
+                        error: None,
+                    })
+                }
             }
+            Err(_) => Ok(Response {
+                token: None,
+                error: Some("Unexpected error".to_string()),
+            }),
         };
 
         response
@@ -114,24 +118,31 @@ impl Mutation {
 
         let response = match results {
             Ok(users) => {
-                let user = users.first().unwrap();
-                match bcrypt::verify(pass, &user.pass) {
-                    true => {
-                        let token = encode(&JWT_SECRET.to_string(), &user.user_id);
-                        Ok(Response {
-                            token: Some(token),
-                            error: None,
-                        })
+                if users.len() > 0 {
+                    let user = users.first().unwrap();
+                    match bcrypt::verify(pass, &user.pass) {
+                        true => {
+                            let token = encode(&JWT_SECRET.to_string(), &user.user_id);
+                            Ok(Response {
+                                token: Some(token),
+                                error: None,
+                            })
+                        }
+                        false => Ok(Response {
+                            token: None,
+                            error: Some("Password is wrong".to_string()),
+                        }),
                     }
-                    false => Ok(Response {
+                } else {
+                    Ok(Response {
                         token: None,
-                        error: Some("Password is wrong".to_string()),
-                    }),
+                        error: Some("Email doesn't exist".to_string()),
+                    })
                 }
             }
             Err(_) => Ok(Response {
                 token: None,
-                error: Some("Email doesn't exist".to_string()),
+                error: Some("Unexpected error".to_string()),
             }),
         };
         response
@@ -168,14 +179,6 @@ impl Mutation {
 pub struct Subscription;
 #[graphql_subscription(context = GraphQLContext)]
 impl Subscription {
-    async fn subscribe_account(context: &GraphQLContext) -> UserInfoStream {
-        tokio_stream::wrappers::BroadcastStream::new(context.sender.subscribe())
-            .map(|result| match result {
-                Ok(userinfo) => Ok(userinfo),
-                Err(err) => Err(FieldError::from(err.to_string())),
-            })
-            .boxed()
-    }
     async fn subscribe_message(context: &GraphQLContext, id: String) -> ChatMessageStream {
         tokio_stream::wrappers::BroadcastStream::new(context.chat_message_sender.subscribe())
             .map(move |result| match result {

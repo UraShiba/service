@@ -35,7 +35,7 @@ impl UserInfo {
     fn user_name(&self) -> &str {
         &self.user_name
     }
-    fn login_name(&self) -> &str {
+    fn email(&self) -> &str {
         &self.email
     }
     fn pass(&self) -> &str {
