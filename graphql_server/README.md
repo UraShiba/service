@@ -16,38 +16,33 @@
 # Schema
 ## Sign Up
 ```
-mutation ($userId:Int!,$userName:String!,$loginName:String!,$pass:String!) {
-  signUp(userId:$userId,userName:$userName,loginName:$loginName,pass:$pass,){
+query {
+  getAccounts{
     userId,
     userName,
-    loginName,
+    email,
     pass,
+  }
+}
+
+mutation ($userName:String!,$email:String!,$pass:String!) {
+  signUp(userName:$userName,email:$email,pass:$pass,){
+    token
+    error
+  }
+}
+
+mutation ($email:String!,$pass:String!) {
+  signIn(email:$email,pass:$pass,){
+    token
+    error
   }
 }
 
 {
-  "userId": 10,
   "userName": "TEST",
-  "loginName": "test@email.com",
-  "pass": "password"
-}
-
-query {
-  getAccountByQuery(id:10){
-    userId,
-    userName,
-    loginName,
-    pass,
-  }
-}
-
-subscription {
-  subscribeAccount {
-    userId,
-    userName,
-    loginName,
-    pass,
-  }
+  "email": "test@com",
+  "pass": "test"
 }
 ```
 ## Chat Message
