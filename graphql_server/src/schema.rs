@@ -4,16 +4,16 @@ table! {
         from_user_id -> Text,
         to_user_id -> Text,
         message_text -> Text,
-        sent_datetime -> Text,
+        sent_date_time -> Text,
     }
 }
 
 table! {
-    user_info (email) {
+    user_info (user_id) {
         user_id -> Text,
         user_name -> Text,
         email -> Text,
-        password -> Text,
+        pass -> Text,
     }
 }
 
