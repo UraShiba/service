@@ -2,8 +2,8 @@
 extern crate diesel;
 extern crate dotenv;
 
+mod auth;
 pub mod context;
-pub mod graphql;
-pub mod models;
-pub mod schema;
 pub mod endpoints;
+pub mod graphql;
+mod models;

@@ -1,18 +1,14 @@
-use diesel::pg::PgConnection;
-use diesel::r2d2::ConnectionManager;
+use crate::models::{ChatMessage, UserInfo};
+use diesel::{r2d2::ConnectionManager, pg::PgConnection};
 use dotenv::dotenv;
 use r2d2::Pool;
 use std::env;
 use tokio::sync::broadcast;
 
-use crate::models::ChatMessage;
-
-use super::models::UserInfo;
-
 // The Postgres-specific connection pool managing all database connections.
-pub type PostgresPool = Pool<ConnectionManager<PgConnection>>;
+type PostgresPool = Pool<ConnectionManager<PgConnection>>;
 
-pub fn get_pool(env: &str) -> PostgresPool {
+fn get_pool(env: &str) -> PostgresPool {
     // TODO: pass the connection URL into this function rather than extracting
     // it from the environment within this function
     dotenv().ok();
@@ -32,6 +28,19 @@ pub struct GraphQLContext {
     pub pool: PostgresPool,
     pub sender: broadcast::Sender<UserInfo>,
     pub chat_message_sender: broadcast::Sender<ChatMessage>,
+}
+
+impl GraphQLContext {
+    pub fn new() -> Self {
+        let pool = get_pool("DATABASE_URL");
+        let (sender, _) = broadcast::channel::<UserInfo>(100);
+        let (chat_message_sender, _) = broadcast::channel::<ChatMessage>(100);
+        GraphQLContext {
+            pool,
+            sender,
+            chat_message_sender,
+        }
+    }
 }
 
 // This impl allows us to pass in GraphQLContext as the Context for GraphQL

@@ -16,8 +16,8 @@
 # Schema
 ## Sign Up
 ```
-query {
-  getAccounts{
+query ($token:String!) {
+  getAccounts(token:$token){
     userId,
     userName,
     email,
@@ -25,17 +25,19 @@ query {
   }
 }
 
+{
+  "token": "Enter your token here"
+}
+
 mutation ($userName:String!,$email:String!,$pass:String!) {
   signUp(userName:$userName,email:$email,pass:$pass,){
     token
-    error
   }
 }
 
 mutation ($email:String!,$pass:String!) {
   signIn(email:$email,pass:$pass,){
     token
-    error
   }
 }
 

@@ -1,23 +1,22 @@
+pub mod schema;
+
+use schema::chat_message;
+use schema::user_info;
 use super::context::GraphQLContext;
-use super::schema::chat_message;
-use super::schema::user_info;
 use juniper::graphql_object;
 
 #[derive(Debug, Clone)]
 pub struct Response {
-    pub token: Option<String>,
-    pub error: Option<String>,
+    pub token: String
 }
 
 #[graphql_object(context = GraphQLContext)]
 impl Response {
-    fn token(&self) -> &Option<String> {
+    fn token(&self) -> &String {
         &self.token
     }
-    fn error(&self) -> &Option<String> {
-        &self.error
-    }
 }
+
 #[derive(Queryable, Debug, Insertable, Clone)]
 #[table_name = "user_info"]
 pub struct UserInfo {

@@ -1,29 +1,23 @@
 use actix_web::{middleware, web::Data, App, HttpServer};
 use env_logger;
-use graphql_server::context::get_pool;
+use graphql_server::context::GraphQLContext;
 use graphql_server::endpoints::{graphql_endpoints, subscription_endpoints};
 use graphql_server::graphql::schema;
-use graphql_server::models::{ChatMessage, UserInfo};
 use std::{env, io};
-use tokio::sync::broadcast;
 
 #[tokio::main]
 pub async fn main() -> io::Result<()> {
     env::set_var("RUST_LOG", "actix_web=info");
     env_logger::init();
     // Instantiate a new connection pool
-    let pool = get_pool("DATABASE_URL");
-    let (sender, _) = broadcast::channel::<UserInfo>(100);
-    let (chat_message_sender, _) = broadcast::channel::<ChatMessage>(100);
+    let context = GraphQLContext::new();
     // Start up the server, passing in (a) the connection pool
     // to make it available to all endpoints and (b) the configuration
     // function that adds the /graphql logic.
     HttpServer::new(move || {
         App::new()
-            .app_data(Data::new(pool.clone()))
+            .app_data(Data::new(context.clone()))
             .app_data(Data::new(schema()))
-            .app_data(Data::new(sender.clone()))
-            .app_data(Data::new(chat_message_sender.clone()))
             .wrap(middleware::Logger::default())
             .configure(graphql_endpoints)
             .configure(subscription_endpoints)

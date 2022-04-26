@@ -1,19 +1,12 @@
-use crate::models::Response;
-
-use super::context::GraphQLContext;
-use super::models::ChatMessage;
-use super::models::UserInfo;
-use super::schema::chat_message::dsl::chat_message;
-use super::schema::user_info::dsl::user_info;
+use crate::auth::{authorize, encode, hashing_password, JWT_SECRET};
+use crate::context::GraphQLContext;
+use crate::models::schema::{chat_message::dsl::chat_message, user_info::dsl::user_info};
+use crate::models::{ChatMessage, Response, UserInfo};
 
 use chrono::{DateTime, Local};
-use diesel::pg::PgConnection;
-use diesel::prelude::*;
-use juniper::{graphql_object, graphql_subscription, FieldError};
-use juniper::{FieldResult, RootNode};
+use diesel::{pg::PgConnection, prelude::*};
+use juniper::{graphql_object, graphql_subscription, FieldError, FieldResult, RootNode};
 use pwhash::bcrypt;
-use serde::Deserialize;
-use serde::Serialize;
 use std::pin::Pin;
 use tokio_stream::Stream;
 use uuid::Uuid;
@@ -29,14 +22,17 @@ pub fn schema() -> Schema {
 pub struct Query;
 #[graphql_object(context = GraphQLContext)]
 impl Query {
-    async fn getAccounts(
-        context: &GraphQLContext,
-    ) -> FieldResult<Vec<UserInfo>> {
-        let conn: &PgConnection = &context.pool.get().unwrap();
-        let results = user_info
-            .load::<UserInfo>(conn)
-            .expect("Error loading customer");
-        Ok(results)
+    async fn getAccounts(context: &GraphQLContext, token: String) -> FieldResult<Vec<UserInfo>> {
+        match authorize(&JWT_SECRET.to_string(), token) {
+            Ok(_) => {
+                let conn: &PgConnection = &context.pool.get().unwrap();
+                let results = user_info
+                    .load::<UserInfo>(conn)
+                    .expect("Error loading customer");
+                Ok(results)
+            }
+            Err(e) => Err(FieldError::from(e.message)),
+        }
     }
     async fn getMessageByQuery(
         context: &GraphQLContext,
@@ -44,7 +40,7 @@ impl Query {
     ) -> FieldResult<Vec<ChatMessage>> {
         let conn: &PgConnection = &context.pool.get().unwrap();
         let results = chat_message
-            .filter(crate::schema::chat_message::to_user_id.eq(id))
+            .filter(crate::models::schema::chat_message::to_user_id.eq(id))
             .load::<ChatMessage>(conn)
             .expect("Error loading customer");
         Ok(results)
@@ -65,7 +61,7 @@ impl Mutation {
         let hashing_pass = hashing_password(&pass);
 
         let results = user_info
-            .filter(crate::schema::user_info::email.eq(email.clone()))
+            .filter(crate::models::schema::user_info::email.eq(email.clone()))
             .limit(1)
             .load::<UserInfo>(conn);
 
@@ -76,13 +72,10 @@ impl Mutation {
             pass: hashing_pass,
         };
 
-        let response = match results {
+        match results {
             Ok(users) => {
                 if users.len() > 0 {
-                    Ok(Response {
-                        token: None,
-                        error: Some("Email already exists".to_string()),
-                    })
+                    Err(FieldError::from("Email already exists".to_string()))
                 } else {
                     diesel::insert_into(user_info)
                         .values(&user)
@@ -90,19 +83,11 @@ impl Mutation {
                         .expect("Error adding new Users");
 
                     let token = encode(&JWT_SECRET.to_string(), &user.user_id);
-                    Ok(Response {
-                        token: Some(token),
-                        error: None,
-                    })
+                    Ok(Response { token })
                 }
             }
-            Err(_) => Ok(Response {
-                token: None,
-                error: Some("Unexpected error".to_string()),
-            }),
-        };
-
-        response
+            Err(_) => Err(FieldError::from("Unexpected error".to_string())),
+        }
     }
 
     async fn signIn(
@@ -112,40 +97,27 @@ impl Mutation {
     ) -> FieldResult<Response> {
         let conn: &PgConnection = &context.pool.get().unwrap();
         let results = user_info
-            .filter(crate::schema::user_info::email.eq(email.clone()))
+            .filter(crate::models::schema::user_info::email.eq(email.clone()))
             .limit(1)
             .load::<UserInfo>(conn);
 
-        let response = match results {
+        match results {
             Ok(users) => {
                 if users.len() > 0 {
                     let user = users.first().unwrap();
                     match bcrypt::verify(pass, &user.pass) {
                         true => {
                             let token = encode(&JWT_SECRET.to_string(), &user.user_id);
-                            Ok(Response {
-                                token: Some(token),
-                                error: None,
-                            })
+                            Ok(Response { token })
                         }
-                        false => Ok(Response {
-                            token: None,
-                            error: Some("Password is wrong".to_string()),
-                        }),
+                        false => Err(FieldError::from("Password is wrong".to_string())),
                     }
                 } else {
-                    Ok(Response {
-                        token: None,
-                        error: Some("Email doesn't exist".to_string()),
-                    })
+                    Err(FieldError::from("Email doesn't exist".to_string()))
                 }
             }
-            Err(_) => Ok(Response {
-                token: None,
-                error: Some("Unexpected error".to_string()),
-            }),
-        };
-        response
+            Err(e) => Err(FieldError::from(e)),
+        }
     }
 
     async fn send_message(
@@ -198,31 +170,4 @@ impl Subscription {
             })
             .boxed()
     }
-}
-
-const JWT_SECRET: &str = "urashiba";
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Claims {
-    exp: i64,
-    uuid: String,
-}
-
-pub fn encode(secret: &String, id: &String) -> String {
-    let mut header = jsonwebtoken::Header::default();
-    header.typ = Some(String::from("JWT"));
-    header.alg = jsonwebtoken::Algorithm::HS256;
-    let claim = Claims {
-        exp: (chrono::Utc::now() + chrono::Duration::hours(8)).timestamp(),
-        uuid: id.to_string(),
-    };
-    jsonwebtoken::encode(
-        &header,
-        &claim,
-        &jsonwebtoken::EncodingKey::from_secret(secret.as_ref()),
-    )
-    .unwrap()
-}
-
-pub fn hashing_password(password: &String) -> String {
-    bcrypt::hash(password).unwrap()
 }
